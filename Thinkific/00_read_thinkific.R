@@ -111,3 +111,33 @@ for(i in 1:length(table_list)) {
               ##  column specific to the response table we're currently processing
               by = c("hash", "question"))
 }
+
+
+##  now that we have codes for every question, rename answer headers to match
+for(i in 1:length(table_list)) {
+  ##  go grab the response table we're working with on this loop and save it
+  response_holding <- get(table_list[i]) %>% 
+    ##  keep only columns not containing questions
+    select(-contains("Question "))
+  
+  ##  we need to get the hash code for each question, based on response table and position
+  get_hashes <- all_questions %>%
+    ##  keep only the columns with the code and the relevant position
+    select(hash, table_list[[i]]) %>%
+    ##  remove any rows for questions that weren't asked of this group
+    na.omit() %>%
+    ##  positions are stored as text, change them to numbers so we can put them in order
+    mutate(position = as.numeric(.[[2]])) %>%
+    ##  put codes in numeric order by position
+    arrange(position)
+  
+  ##  update the column names in the response table we're working with 
+  colnames(response_holding) <- c(
+    ##  columns prior to the questions keep their original names
+    colnames(response_holding)[1:which(colnames(response_holding) == "Total Number of Questions")],
+    ##  question columns are renamed with the ordered codes from the previous step
+    get_hashes$hash)
+  
+  ##  replace the original table we grabbed with the one we just updated
+  assign(table_list[i], response_holding)
+}
