@@ -18,13 +18,14 @@ library(tidyverse)
 library(lubridate)
 library(readxl)
 library(stringr)
+library(lubridate)
 
 
 ##  pick file to read in
 get_file <- file.choose()
 
 
-##  create prefix for tables`
+##  create prefix for tables
 {
   ##  get the actual file name
   file_name <- sapply(strsplit(get_file,"\\\\"), `[`, 11)
@@ -141,3 +142,79 @@ for(i in 1:length(table_list)) {
   ##  replace the original table we grabbed with the one we just updated
   assign(table_list[i], response_holding)
 }
+
+
+##  remove all extra variables created in our loops
+rm(list = ls()[!(ls() %in% c(
+  ls(pattern = prefix),
+  "all_questions",
+  "question_table"
+))])
+
+
+## get the additional question information from a separate file and read it in
+# question_table <- read_excel(file.choose())
+# question_table$hash <- lapply(question_table$Question, function(x) {hash(x)})
+# 
+# combined <- all_questions %>%
+#   full_join(question_table%>%
+#               mutate(hash = unlist(hash))
+#             , by = "hash")
+# 
+# write.csv(combined, file = "qs.csv")
+
+
+##  create an empty frame to hold all the response information
+question_responses <- data.frame('Course Name' = character(), 
+                                 'Survey Name' = character(),
+                                 'Student Email' = character(),
+                                 # 'Date Completed' = as.Date(character()),
+                                 ## storing as character for now
+                                 ## some files have dates that cannot be easily parsed
+                                 'Date Completed' = character(),
+                                 'Question' = character(),
+                                 'Answer' = character())
+##  R doesn't like column names with spaces, so we force them here
+colnames(question_responses) <- c(
+  'Course Name', 'Survey Name', 'Student Email', 'Date Completed', 'Question', 'Answer')
+
+
+for (i in 1:length(all_questions)) {
+  ##  pick question to get responses for
+  isolated_question <- all_questions[i, ]
+  ##  create a list of all the groups that were asked that question
+  responding_groups <- isolated_question[ , colSums(is.na(isolated_question)) < nrow(isolated_question)]
+  ##  grab the code that represents that question
+  question <- responding_groups[[1]]
+  
+  ##  the first two columns are the question code and the question text, so we skip those
+  for (j in 3:length(responding_groups)) {
+    ##  grab every column besides those two and go look up the responses
+    group_responses <- get(colnames(responding_groups)[j]) %>%
+      mutate(Question = question,
+             ## remove this one once date issue is solved
+             'Date Completed' = as.character('Date Completed')) %>%
+      select('Course Name',
+             'Survey Name', 
+             'Student Email',
+             'Date Completed',
+             'Question',
+             all_of(question)
+      )
+    
+    colnames(group_responses) <- c(
+      'Course Name', 'Survey Name', 'Student Email', 'Date Completed', 'Question', 'Answer')
+    
+    ##  add these responses to the holding table
+    question_responses <- question_responses %>%
+      full_join(group_responses,
+                by = colnames(question_responses))
+  }
+  
+}
+
+rm(list = ls()[!(ls() %in% c(
+  "question_responses"
+))])
+
+
