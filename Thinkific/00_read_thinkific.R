@@ -214,7 +214,14 @@ for (i in 1:length(all_questions)) {
 }
 
 rm(list = ls()[!(ls() %in% c(
-  "question_responses"
+  "question_responses",
+  "all_questions"
 ))])
 
 
+save(list = ls(), file = "Thinkific/images/thinkific.RData", compress = FALSE)
+
+
+as.character(all_questions %>%
+  filter(question == "Are acts of individual bias usually visible or invisible?") %>%
+  select(hash))
