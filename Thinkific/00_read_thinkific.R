@@ -51,9 +51,13 @@ for(i in 1:length(excel_sheets(get_file))) {
   if (colnames(file_hold)[1] == "Column1") {
     file_hold <- read_excel(get_file, sheet = excel_sheets(get_file)[i], skip = 1)
   }
-  
-  ##  get the top left cell to identify the group included in this table to use as suffix
-  suffix <- str_squish((str_replace_all(file_hold[[1,1]], regex("\\W+"), "")))
+  ##  get the top left cell to identify the group included in this table
+  group <- file_hold[[1,1]]
+  ##  remove any rows that aren't labeled with that row; rare Thinkific quirk
+  file_hold <- file_hold %>%
+    filter(`Course Name` == group)
+  ##  use group to create suffix
+  suffix <- str_squish((str_replace_all(group, regex("\\W+"), "")))
   ##  join the prefix from earlier and the suffix to create a unique table name
   table_name <- paste0(prefix, "_", suffix)
   ##  name the table 
@@ -148,20 +152,9 @@ for(i in 1:length(table_list)) {
 rm(list = ls()[!(ls() %in% c(
   ls(pattern = prefix),
   "all_questions",
-  "question_table"
+  "question_table",
+  "prefix"
 ))])
-
-
-## get the additional question information from a separate file and read it in
-# question_table <- read_excel(file.choose())
-# question_table$hash <- lapply(question_table$Question, function(x) {hash(x)})
-# 
-# combined <- all_questions %>%
-#   full_join(question_table%>%
-#               mutate(hash = unlist(hash))
-#             , by = "hash")
-# 
-# write.csv(combined, file = "qs.csv")
 
 
 ##  create an empty frame to hold all the response information
@@ -215,13 +208,13 @@ for (i in 1:length(all_questions)) {
 
 rm(list = ls()[!(ls() %in% c(
   "question_responses",
-  "all_questions"
+  "all_questions",
+  "prefix"
 ))])
 
 
 save(list = ls(), file = "Thinkific/images/thinkific.RData", compress = FALSE)
 
 
-as.character(all_questions %>%
-  filter(question == "Are acts of individual bias usually visible or invisible?") %>%
-  select(hash))
+write.csv(question_responses, file = paste0(prefix, ".csv"))
+
