@@ -22,7 +22,7 @@ library(lubridate)
 
 
 all_surveys <- list.files(
-  paste0(getwd(), "/Thinkific/data/Thinkific Exports"),
+  paste0(getwd(), "/data/Thinkific Exports"),
   full.names = TRUE)
 
 
@@ -52,26 +52,29 @@ for (get_file in all_surveys) {
   
   ##  read in file information
   for(i in 1:length(excel_sheets(get_file))) {
-    ##  do initial file read
-    file_hold <- read_excel(get_file, sheet = excel_sheets(get_file)[i])
-    ##  check if there's an extra header row; if there is, read again but ignore the first row 
-    if (colnames(file_hold)[1] == "Column1") {
-      file_hold <- read_excel(get_file, sheet = excel_sheets(get_file)[i], skip = 1)
+    sheet_name <- excel_sheets(get_file)[i]
+    if (sheet_name != "Sheet1") {
+      ##  do initial file read
+      file_hold <- read_excel(get_file, sheet = sheet_name)
+      ##  check if there's an extra header row; if there is, read again but ignore the first row 
+      if (colnames(file_hold)[1] == "Column1") {
+        file_hold <- read_excel(get_file, sheet = excel_sheets(get_file)[i], skip = 1)
+      }
+      ##  get the top left cell to identify the group included in this table
+      group <- file_hold[[1,1]]
+      ##  remove any rows that aren't labeled with that row; rare Thinkific quirk
+      file_hold <- file_hold %>%
+        filter(`Course Name` == group)
+      ##  use group to create suffix
+      suffix <- str_squish((str_replace_all(group, regex("\\W+"), "")))
+      ##  join the prefix from earlier and the suffix to create a unique table name
+      table_name <- paste0(prefix, "_", suffix)
+      ##  name the table 
+      assign(table_name, file_hold)
+      
+      ##  store the table name in a list so we can look it up later
+      table_list <- c(table_list, table_name)
     }
-    ##  get the top left cell to identify the group included in this table
-    group <- file_hold[[1,1]]
-    ##  remove any rows that aren't labeled with that row; rare Thinkific quirk
-    file_hold <- file_hold %>%
-      filter(`Course Name` == group)
-    ##  use group to create suffix
-    suffix <- str_squish((str_replace_all(group, regex("\\W+"), "")))
-    ##  join the prefix from earlier and the suffix to create a unique table name
-    table_name <- paste0(prefix, "_", suffix)
-    ##  name the table 
-    assign(table_name, file_hold)
-    
-    ##  store the table name in a list so we can look it up later
-    table_list <- c(table_list, table_name)
   }
   
   

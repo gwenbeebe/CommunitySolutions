@@ -1,5 +1,5 @@
 all_surveys <- list.files(
-  paste0(getwd(), "/Thinkific/cleaned_data"),
+  paste0(getwd(), "/cleaned_data"),
   full.names = TRUE)
 
 complete_response_table <- data.frame(Course.Name = character(), 
