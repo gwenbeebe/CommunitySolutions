@@ -1,6 +1,6 @@
 ##  this code is NOT currently freestanding
 
-keynote_free_text <- complete_response_table %>%
+keynote_free_text <- question_responses %>%
   filter(Question %in% c(
     "b8e47823a56e28cc44c437dd50246354",
     "4f2828b67671f45c14c4b248c5f31f91",
