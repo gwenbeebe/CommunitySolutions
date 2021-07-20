@@ -20,19 +20,47 @@ library(readxl)
 library(stringr)
 library(janitor)
 
-
+#################################################
+##  update arrests data
+#################################################
 ##  pick arrests file to read in
 arrest_file <- file.choose(); arrest_data <- read_excel(arrest_file)
 
-##  pick releases file to read in
-release_file <- file.choose(); release_data <- read_excel(release_file)
-
-##  pick admissions file to read in
-admission_file <- file.choose(); admission_data <- read_excel(admission_file)
-
 arrest_columns <- as.data.frame(colnames(arrest_data))
-release_columns <- as.data.frame(colnames(release_data))
-admission_columns <- as.data.frame(colnames(admission_data))
+
+extra_file <- file.choose()
+##  remove extra rows 
+extra_data <- read_excel(extra_file)
+extra_data <- read_excel(extra_file,  
+                         skip = which(extra_data == "Gallery", arr.ind=TRUE)[1]) %>%
+  separate("Inmate Name", c('LastName', 'FirstName'), sep = ", ") %>%
+  mutate(LN3 = substr(LastName, 0, 3),
+         FN3 = substr(FirstName, 0, 3)) %>%
+  rename("GALLERY" = "Gallery"
+         , "BookingDate" = "Book Date"
+         , "Booking#" = "Book NO."
+         # , "XXX" = "Inmate Name"
+         , "SEX" = "Gender"
+         , "HISPANICLATINO" = "Hispanic/Latino"
+         , "RACE" = "Race"
+         , "AdmissionType" = "Admission Type"
+         , "ADMITDOCUMENTATIONTYPE" = "Admit Documention Type"
+         , "JAILLOCATION" = "Jail"
+         # , "XXX" = "Degree"
+         , "GradeClass" = "Grade"
+         , "OffenseDescription" = "Offense Description"
+         , "SenYN" = "Sen Y/N"
+         , "CaseSenStatus" = "Case Sen Status"
+         , "DetainerHOLDCharge" = "Detainer Hold Charge"
+         , "DetainerIssuingAgency" = "Detainer Agency"
+         , "ReleaseType" = "Release Type"
+         # , "XXX" = "Temp Rel. Date"
+         , "ReleaseDate" = "Rel. Date"
+         ) %>%
+  select(LN3, FN3, DOB, BookingDate, AdmissionType)
+
+arrest_data <- arrest_data %>%
+  full_join(extra_data, by = c("LN3", "FN3", "DOB", "BookingDate", "AdmissionType"))
 
 
 # add key columns and remove duplicates
@@ -43,13 +71,22 @@ arrest_data_clean <- arrest_data %>%
          arrest_row_id = row_number()) %>%
   distinct(person_id, BookingDate, .keep_all = TRUE)
 
-admission_data_clean <- admission_data %>%
-  mutate(person_id = paste0(substr(LASTNAME, 0, 3),
-                            substr(FIRSTNAM, 0, 3),
-                            str_replace_all(DOB, "[^[:alnum:]]", "")),
-         admit_row_id = row_number()) %>%
-  distinct(person_id, INTKDT, .keep_all = TRUE)
+small_arrests <- arrest_data_clean %>%
+  filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
+                              "OUTRIGHT WITH WARRANTS")) %>%
+  select("person_id", "BookingDate", "AdmissionType")
 
+write.csv(small_arrests, file = "small_arrests.csv", row.names = FALSE)
+
+#################################################
+##  update release data
+#################################################
+##  pick releases file to read in
+release_file <- file.choose(); release_data <- read_excel(release_file)
+
+release_columns <- as.data.frame(colnames(release_data))
+
+# add key columns and remove duplicates
 release_data_clean <- release_data %>%
   mutate(person_id = paste0(substr(LASTNAME, 0, 3),
                             substr(FIRSTNAM, 0, 3),
@@ -57,6 +94,66 @@ release_data_clean <- release_data %>%
          release_row_id = row_number()) %>%
   distinct(person_id, FACRLD, .keep_all = TRUE)
 
+small_releases <- release_data_clean %>%
+  filter(COUNTY == 49) %>%
+  select(person_id, RELFROM, COUNTY, FACRLD)
+
+write.csv(small_releases, file = "small_releases.csv", row.names = FALSE)
+
+
+#################################################
+##  update admissions data
+#################################################
+##  pick admissions file to read in
+admission_file <- file.choose(); admission_data <- read_excel(admission_file)
+
+admission_columns <- as.data.frame(colnames(admission_data))
+
+# add key columns and remove duplicates
+admission_data_clean <- admission_data %>%
+  mutate(person_id = paste0(substr(LASTNAME, 0, 3),
+                            substr(FIRSTNAM, 0, 3),
+                            str_replace_all(DOB, "[^[:alnum:]]", "")),
+         admit_row_id = row_number()) %>%
+  distinct(person_id, INTKDT, .keep_all = TRUE)
+
+# write base csvs
+small_admits <- admission_data_clean %>%
+  select(person_id, COUNTY, INTKDT)
+
+write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)
+
+
+#################################################
+##  update demographics data
+#################################################
+demographics_columns <- c("person_id", "last_name", "first_name",
+                          "dob", "sex", "race", "information_date")
+small_demographics <- admission_data_clean %>%
+  select(person_id, LASTNAME, FIRSTNAM, DOB, SEX, RACE, INTKDT) %>%
+  `colnames<-`(demographics_columns) %>%
+  mutate(origin = "admissions") %>%
+  union_all(arrest_data_clean %>%
+              filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
+                                          "OUTRIGHT WITH WARRANTS")) %>%
+              select(person_id, LastName, FirstName, DOB, SEX, RACE, BookingDate) %>%
+              `colnames<-`(demographics_columns) %>%
+              mutate(origin = "arrests")) %>%
+  union_all(release_data_clean %>%
+              filter(COUNTY == 49) %>%
+              select(person_id, LASTNAME, FIRSTNAM, DOB, SEX, RACE, FACRLD) %>%
+              `colnames<-`(demographics_columns) %>%
+              mutate(origin = "releases")) %>%
+  arrange(race, desc(information_date)) %>%
+  distinct(person_id, #last_name, first_name, dob, sex, race, 
+           .keep_all = TRUE) %>%
+  select(-information_date)
+
+write.csv(small_demographics, file = "small_demographics.csv", row.names = FALSE)
+
+
+
+##  summaries
 
 # create recidivism summary
 recidivism <- release_data_clean %>%
@@ -67,12 +164,12 @@ recidivism <- release_data_clean %>%
               filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
                                           "OUTRIGHT WITH WARRANTS")) %>%
               select(person_id, BookingDate),
-              # select(DOCNUM, INTKDT),
+            # select(DOCNUM, INTKDT),
             by = "person_id") %>%
   mutate(return_flag = case_when(
     FACRLD < BookingDate
-      # & (FACRLD + days(364)) >= BookingDate ~ TRUE,
-      & (FACRLD + days(182)) >= BookingDate ~ TRUE,
+    # & (FACRLD + days(364)) >= BookingDate ~ TRUE,
+    & (FACRLD + days(182)) >= BookingDate ~ TRUE,
     TRUE ~ FALSE)) %>%
   arrange(desc(return_flag)) %>%
   select(-BookingDate) %>%
@@ -105,50 +202,7 @@ ggplot(chart_table, aes(fill=return_flag, y=people, x=month_of_release)) +
   coord_flip()
 
 
-# write base csvs
-small_admits <- admission_data_clean %>%
-  select(person_id, COUNTY, INTKDT)
 
-write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)
-
-
-small_arrests <- arrest_data_clean %>%
-  filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
-                              "OUTRIGHT WITH WARRANTS")) %>%
-  select(person_id, BookingDate, AdmissionType)
-
-write.csv(small_arrests, file = "small_arrests.csv", row.names = FALSE)
-
-
-small_releases <- release_data_clean %>%
-  filter(COUNTY == 49) %>%
-  select(person_id, RELFROM, COUNTY, FACRLD)
-
-write.csv(small_releases, file = "small_releases.csv", row.names = FALSE)
-
-demographics_columns <- c("person_id", "last_name", "first_name",
-                          "dob", "sex", "race", "information_date")
-small_demographics <- admission_data_clean %>%
-  select(person_id, LASTNAME, FIRSTNAM, DOB, SEX, RACE, INTKDT) %>%
-  `colnames<-`(demographics_columns) %>%
-  mutate(origin = "admissions") %>%
-  union_all(arrest_data_clean %>%
-              filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
-                                          "OUTRIGHT WITH WARRANTS")) %>%
-              select(person_id, LastName, FirstName, DOB, SEX, RACE, BookingDate) %>%
-              `colnames<-`(demographics_columns) %>%
-              mutate(origin = "arrests")) %>%
-  union_all(release_data_clean %>%
-              filter(COUNTY == 49) %>%
-              select(person_id, LASTNAME, FIRSTNAM, DOB, SEX, RACE, FACRLD) %>%
-              `colnames<-`(demographics_columns) %>%
-              mutate(origin = "releases")) %>%
-  arrange(race, desc(information_date)) %>%
-  distinct(person_id, #last_name, first_name, dob, sex, race, 
-           .keep_all = TRUE) %>%
-  select(-information_date)
-
-write.csv(small_demographics, file = "small_demographics.csv", row.names = FALSE)
 
 # used this for spot checking the demographics table for uniqueness
 # identify_flaws <- small_demographics  %>%
