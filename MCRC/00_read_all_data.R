@@ -20,6 +20,8 @@ library(readxl)
 library(stringr)
 library(janitor)
 
+`%nin%` = Negate(`%in%`)
+
 #################################################
 ##  update arrests data
 #################################################
@@ -39,6 +41,7 @@ extra_data <- read_excel(extra_file,
   rename("GALLERY" = "Gallery"
          , "BookingDate" = "Book Date"
          , "Booking#" = "Book NO."
+         # , "Booking#" = "Book No"
          # , "XXX" = "Inmate Name"
          , "SEX" = "Gender"
          , "HISPANICLATINO" = "Hispanic/Latino"
@@ -46,6 +49,7 @@ extra_data <- read_excel(extra_file,
          , "AdmissionType" = "Admission Type"
          , "ADMITDOCUMENTATIONTYPE" = "Admit Documention Type"
          , "JAILLOCATION" = "Jail"
+         # , "JAILLOCATION" = "Jail Location"
          # , "XXX" = "Degree"
          , "GradeClass" = "Grade"
          , "OffenseDescription" = "Offense Description"
@@ -72,9 +76,9 @@ arrest_data_clean <- arrest_data %>%
   distinct(person_id, BookingDate, .keep_all = TRUE)
 
 small_arrests <- arrest_data_clean %>%
-  filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
-                              "OUTRIGHT WITH WARRANTS")) %>%
-  select("person_id", "BookingDate", "AdmissionType")
+  # filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
+  #                             "OUTRIGHT WITH WARRANTS")) %>%
+  select("person_id", "BookingDate", "AdmissionType", "GALLERY")
 
 write.csv(small_arrests, file = "small_arrests.csv", row.names = FALSE)
 
@@ -83,6 +87,10 @@ write.csv(small_arrests, file = "small_arrests.csv", row.names = FALSE)
 #################################################
 ##  pick releases file to read in
 release_file <- file.choose(); release_data <- read_excel(release_file)
+
+##  when there's extra rows
+release_data <- read_excel(release_file,  
+                         skip = which(release_data == "Obs", arr.ind=TRUE)[1])
 
 release_columns <- as.data.frame(colnames(release_data))
 
@@ -107,6 +115,10 @@ write.csv(small_releases, file = "small_releases.csv", row.names = FALSE)
 ##  pick admissions file to read in
 admission_file <- file.choose(); admission_data <- read_excel(admission_file)
 
+##  when there's extra rows
+admission_data <- read_excel(admission_file,  
+                           skip = which(admission_data == "Obs", arr.ind=TRUE)[1])
+
 admission_columns <- as.data.frame(colnames(admission_data))
 
 # add key columns and remove duplicates
@@ -115,11 +127,15 @@ admission_data_clean <- admission_data %>%
                             substr(FIRSTNAM, 0, 3),
                             str_replace_all(DOB, "[^[:alnum:]]", "")),
          admit_row_id = row_number()) %>%
-  distinct(person_id, INTKDT, .keep_all = TRUE)
+  # filter(INTKSTCD %nin% c(10, 11, 15, 16, 17, 18, 43)) %>%
+  # distinct(person_id, INTKDT, .keep_all = TRUE)
+  distinct(person_id, RECVDT, .keep_all = TRUE)
 
 # write base csvs
 small_admits <- admission_data_clean %>%
-  select(person_id, COUNTY, INTKDT)
+  select(-INTKDT) %>%
+  rename(INTKDT = RECVDT) %>%
+  select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM)
 
 write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)
 
@@ -202,8 +218,6 @@ ggplot(chart_table, aes(fill=return_flag, y=people, x=month_of_release)) +
   coord_flip()
 
 
-
-
 # used this for spot checking the demographics table for uniqueness
 # identify_flaws <- small_demographics  %>%
 #   group_by(person_id) %>%
@@ -212,28 +226,68 @@ ggplot(chart_table, aes(fill=return_flag, y=people, x=month_of_release)) +
 #   filter(differences > 1) %>%
 #   arrange(person_id, origin, information_date)
 
-# splitting out individual charges (in progress)
-release_test <- release_data %>%
-  mutate(row_id = row_number())
-
-release_charges <- release_test %>%
-  select(starts_with("A")) %>%
-  `colnames<-`(substring(names(.), 2)) %>% 
-  remove_empty("rows") #%>%
-  inner_join(release_test %>%
-               select(starts_with("B")) %>%
-               `colnames<-`(substring(names(.), 2))
-               )  %>% 
-  remove_empty("rows")
+# splitting out individual charges from the release data
+for (letter in c("A", "B", "C", "D", "E", "F")) {
   
-release_charges_1 <- release_test %>%
-  select(starts_with("A")) %>%
-  `colnames<-`(substring(names(.), 2)) %>% 
-  remove_empty("rows")
+  r_letter_charges <- release_data_clean %>%
+    filter(COUNTY == 49)  %>%
+    select(c("Obs", starts_with(letter))) %>%
+    `colnames<-`(c("Obs", (substring(names(.)[2:length(.)], 2))))
   
-release_charges_2 <- release_test %>%
-  select(starts_with("B")) %>%
-  `colnames<-`(substring(names(.), 2)) %>% 
-  remove_empty("rows")
+  if (exists("r_columns_to_keep")) {
+    r_columns_to_keep <- intersect(colnames(r_all_charges), colnames(r_letter_charges))
+  } else {
+    r_columns_to_keep <- colnames(r_letter_charges)
+  }
+  
+  if (exists("r_all_charges")) {
+    r_all_charges <- r_all_charges %>%
+      select(r_columns_to_keep) %>%
+      left_join(r_letter_charges %>% 
+                  remove_empty("rows") %>%
+                  filter(!is.na(COURT))
+                , by = r_columns_to_keep)
+  } else {
+    r_all_charges <- r_letter_charges %>% 
+      remove_empty("rows") %>%
+      filter(!is.na(COURT))
+  }
+}
+
+write.csv(r_all_charges, file = "all_release_charges.csv", row.names = FALSE)
 
 
+
+# splitting out individual charges from the admit data
+for (letter in c("A", "B", "C", "D", "E", "F")) {
+  
+  ad_letter_charges <- admission_data_clean %>%
+    select(c("Obs", starts_with(letter))) %>%
+    `colnames<-`(c("Obs", (substring(names(.)[2:length(.)], 2))))
+  
+  if (exists("ad_columns_to_keep")) {
+    ad_columns_to_keep <- intersect(colnames(ad_all_charges), colnames(ad_letter_charges))
+  } else {
+    ad_columns_to_keep <- colnames(ad_letter_charges)
+  }
+  
+  if (exists("ad_all_charges")) {
+    ad_all_charges <- ad_all_charges %>%
+      select(ad_columns_to_keep) %>%
+      full_join(ad_letter_charges %>% 
+                  remove_empty("rows") %>%
+                  filter(!is.na(COURT))
+                , by = ad_columns_to_keep)
+  } else {
+    ad_all_charges <- ad_letter_charges %>% 
+      remove_empty("rows") %>%
+      filter(!is.na(COURT))
+  }
+}
+
+write.csv(ad_all_charges, file = "all_admit_charges.csv", row.names = FALSE)
+
+
+small_admits <- admission_data_clean %>%
+  select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM)
+write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)

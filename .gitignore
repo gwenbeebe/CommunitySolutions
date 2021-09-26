@@ -12,3 +12,7 @@ Thinkific/cleaned_data/
 *.csv
 
 MCRC/data/
+
+*.xlsx
+
+*.docx

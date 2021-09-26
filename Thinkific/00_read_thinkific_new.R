@@ -21,7 +21,7 @@ library(stringr)
 
 
 all_surveys <- list.files(
-  paste0(getwd(), "/data/Thinkific Exports - CSV versions"),
+  paste0(getwd(), "/data/Thinkific Exports - CSV August"),
   full.names = TRUE)
 
 ##  create list to store table names
@@ -81,7 +81,7 @@ for (get_file in all_surveys) {
   all_questions <- data.frame(hash = character(), 
                               question = character())
 
-
+# i <- 214
   ##  create table holding all questions and their locations in each response table
   for(i in 1:length(table_list)) {
     ##  gets the next response table
@@ -131,7 +131,6 @@ for (get_file in all_surveys) {
 
 
 
-  
   ##  now that we have codes for every question, rename answer headers to match
   for(i in 1:length(table_list)) {
     ##  go grab the response table we're working with on this loop and save it
@@ -187,6 +186,7 @@ for (get_file in all_surveys) {
   
   
   for (i in 1:nrow(all_questions)) {
+    hold_i <- i
     ##  pick question to get responses for
     isolated_question <- all_questions[i, ]
     ##  create a list of all the groups that were asked that question
@@ -196,6 +196,7 @@ for (get_file in all_surveys) {
     
     ##  the first two columns are the question code and the question text, so we skip those
     for (j in 3:length(responding_groups)) {
+      hold_j <- j
       ##  grab every column besides those two and go look up the responses
       group_responses <- get(colnames(responding_groups)[j]) %>%
         mutate(Question = question,
@@ -230,8 +231,9 @@ for (get_file in all_surveys) {
   
   # save(list = ls(), file = "Thinkific/images/thinkific.RData", compress = FALSE)
   question_responses <- question_responses %>%
-    distinct()
+    arrange(`Date Completed`) %>%
+    distinct(`Course Name`, `Survey Name`, `Student Email`, Question, .keep_all = TRUE)
   
-  write.csv(question_responses, file = paste0(prefix, ".csv"))
+  write.csv(question_responses, file = "complete_response_table 8.28.21 v2.csv")
   
 
