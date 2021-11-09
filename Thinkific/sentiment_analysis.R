@@ -37,6 +37,50 @@ test_set <- free_responses %>%
            Combined.Questions == "What did you like about this session?")
 
 answers <- iconv(test_set$Answer)
+s <- get_sentiment(answers, method = "bing")
+test <- data.frame(answers)
+
+
+
+test <- read.csv("UnitedFrontSentimentAnalysis\\FreeTextAnswers.csv") %>%
+      filter(!is.na(Answer) &
+                 Combined.Questions %nin% c(
+                     "In what zip code do you currently live?",
+                     "In what zip code is your workplace located?",
+                     "What is your job title?",
+                     "Who is your employer?",
+                     "How did you participate in this session?",
+                     "What happens in our brain when we feel judged, devalued, or not accepted?",
+                     "United Front would like to get some feedback from participants to help with planning for 2022. We thank you in advance for your open and honest responses.On a scale of 1 to 10 with 1 being very dissatisfied and 10 being very satisfied, how satisfied are you with the United Front program so far?"
+                 )) %>%
+  filter(Answer != "")
+answers <- iconv(test$Answer)
+test$syuzhet <- get_sentiment(answers, method = "syuzhet")
+test$bing <- get_sentiment(answers, method = "bing")
+test$afinn <- get_sentiment(answers, method = "afinn")
+test$nrc <- get_sentiment(answers, method = "nrc")
+test_labelled <- test %>%
+  mutate(syuzhet = case_when(syuzhet < 0 ~ "Neg",
+                             syuzhet > 0 ~ "Pos",
+                             TRUE ~ "Neu"),
+         bing = case_when(bing < 0 ~ "Neg",
+                          bing > 0 ~ "Pos",
+                          TRUE ~ "Neu"),
+         afinn = case_when(afinn < 0 ~ "Neg",
+                           afinn > 0 ~ "Pos",
+                           TRUE ~ "Neu"),
+         nrc = case_when(nrc < 0 ~ "Neg",
+                         nrc > 0 ~ "Pos",
+                         TRUE ~ "Neu"))
+
+test_filtered <- test_labelled %>%
+  filter(syuzhet != bing | syuzhet != afinn | syuzhet != nrc |
+           bing != afinn | bing != nrc | afinn != nrc) %>%
+  select(-c("ï..rownum", "Participant.Method")) %>%
+  distinct()
+write.csv(test_filtered, "sentiment_compare.csv")
+
+
 s <- get_nrc_sentiment(answers)
 
 new <- cbind(test_set, s)
