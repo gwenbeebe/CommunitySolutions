@@ -133,8 +133,6 @@ admission_data_clean <- admission_data %>%
 
 # write base csvs
 small_admits <- admission_data_clean %>%
-  select(-INTKDT) %>%
-  rename(INTKDT = RECVDT) %>%
   select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM)
 
 write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)
@@ -242,11 +240,11 @@ for (letter in c("A", "B", "C", "D", "E", "F")) {
   
   if (exists("r_all_charges")) {
     r_all_charges <- r_all_charges %>%
-      select(r_columns_to_keep) %>%
       left_join(r_letter_charges %>% 
                   remove_empty("rows") %>%
                   filter(!is.na(COURT))
-                , by = r_columns_to_keep)
+                , by = r_columns_to_keep) %>%
+      select(r_columns_to_keep)
   } else {
     r_all_charges <- r_letter_charges %>% 
       remove_empty("rows") %>%
@@ -261,7 +259,7 @@ write.csv(r_all_charges, file = "all_release_charges.csv", row.names = FALSE)
 # splitting out individual charges from the admit data
 for (letter in c("A", "B", "C", "D", "E", "F")) {
   
-  ad_letter_charges <- admission_data_clean %>%
+  ad_letter_charges <- admission_data %>%
     select(c("Obs", starts_with(letter))) %>%
     `colnames<-`(c("Obs", (substring(names(.)[2:length(.)], 2))))
   
@@ -273,11 +271,11 @@ for (letter in c("A", "B", "C", "D", "E", "F")) {
   
   if (exists("ad_all_charges")) {
     ad_all_charges <- ad_all_charges %>%
-      select(ad_columns_to_keep) %>%
       full_join(ad_letter_charges %>% 
                   remove_empty("rows") %>%
                   filter(!is.na(COURT))
-                , by = ad_columns_to_keep)
+                , by = ad_columns_to_keep) %>%
+      select(ad_columns_to_keep)
   } else {
     ad_all_charges <- ad_letter_charges %>% 
       remove_empty("rows") %>%
@@ -288,6 +286,38 @@ for (letter in c("A", "B", "C", "D", "E", "F")) {
 write.csv(ad_all_charges, file = "all_admit_charges.csv", row.names = FALSE)
 
 
-small_admits <- admission_data_clean %>%
-  select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM)
-write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)
+
+# get admits for incarceration dashboard
+
+for (letter in c("A", "B", "C", "D", "E", "F")) {
+  if (exists("pivoted_ad_cols")) {
+    pivoted_ad_cols <- c(pivoted_ad_cols, 
+                      paste0(letter, colnames(ad_all_charges)[2:length(colnames(ad_all_charges))]))
+  } else {
+    pivoted_ad_cols <- paste0(letter, colnames(ad_all_charges)[2:length(colnames(ad_all_charges))])
+  }
+}
+
+incarceration_admits <- admission_data %>%
+  filter(COUNTY == 49) %>%
+  select(-pivoted_ad_cols)
+write.csv(incarceration_admits, file = "incarceration_admits.csv", row.names = FALSE)
+
+
+
+# get releases for incarceration dashboard
+
+for (letter in c("A", "B", "C", "D", "E", "F")) {
+  if (exists("pivoted_r_cols")) {
+    pivoted_r_cols <- c(pivoted_r_cols, 
+                         paste0(letter, colnames(r_all_charges)[2:length(colnames(r_all_charges))]))
+  } else {
+    pivoted_r_cols <- paste0(letter, colnames(r_all_charges)[2:length(colnames(r_all_charges))])
+  }
+}
+
+incarceration_releases <- release_data %>%
+  filter(COUNTY == 49) %>%
+  select(-pivoted_r_cols) %>%
+  distinct()
+write.csv(incarceration_releases, file = "incarceration_releases.csv", row.names = FALSE)

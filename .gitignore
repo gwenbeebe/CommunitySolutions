@@ -16,3 +16,15 @@ MCRC/data/
 *.xlsx
 
 *.docx
+
+Opioid/services_provided
+
+*.xml
+
+*.xsl
+
+Thinkific/stanford-corenlp-4.3.1/
+
+*.txt
+
+*.rds

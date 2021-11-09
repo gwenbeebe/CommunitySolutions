@@ -21,7 +21,7 @@ library(stringr)
 
 
 all_surveys <- list.files(
-  paste0(getwd(), "/data/Thinkific Exports - CSV August"),
+  paste0(getwd(), "/data/Thinkific Exports - CSV October"),
   full.names = TRUE)
 
 ##  create list to store table names
@@ -215,9 +215,10 @@ for (get_file in all_surveys) {
       
       ##  add these responses to the holding table
       question_responses <- question_responses %>%
-        full_join(group_responses %>%
-                    mutate(Answer = as.character(Answer)),
+        full_join(group_responses,
                   by = colnames(question_responses))
+      
+      question_responses$Answer <- as.character(question_responses$Answer)
     }
     
   }
@@ -234,6 +235,7 @@ for (get_file in all_surveys) {
     arrange(`Date Completed`) %>%
     distinct(`Course Name`, `Survey Name`, `Student Email`, Question, .keep_all = TRUE)
   
-  write.csv(question_responses, file = "complete_response_table 8.28.21 v2.csv")
+  write.csv(question_responses, file = "complete_response_table 10.24.21.csv",
+            row.names = FALSE)
   
 

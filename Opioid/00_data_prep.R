@@ -24,11 +24,11 @@ source("00_functions.R")
 #################################################
 
 all_months <- list.files(
-  paste0(getwd(), "/data/Client Tracking Reports"),
+  paste0(getwd(), "/data/SU - Client Tracking Reports"),
   full.names = TRUE)
 
 file_names <- list.files(
-  paste0(getwd(), "/data/Client Tracking Reports"))
+  paste0(getwd(), "/data/SU - Client Tracking Reports"))
 
 ##  create list to store table names
 table_list <- c()
@@ -74,4 +74,4 @@ combined_files_clean <- combined_files %>%
             last_name, first_name, date_of_birth))
 
 
-write.csv(combined_files_clean, file = "services_provided.csv", row.names = FALSE)
+write.csv(combined_files_clean, file = "services_provided 10.5.21.csv", row.names = FALSE)

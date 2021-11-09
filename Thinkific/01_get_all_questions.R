@@ -127,8 +127,8 @@
 # 
 # 
 # ## get the additional question information from a separate file and read it in
-# question_table <- read_excel(file.choose())
-# question_table$hash <- lapply(question_table$Question, function(x) {hash(x)})
+question_table <- read_excel(file.choose())
+question_table$hash <- lapply(question_table$Question, function(x) {hash(x)})
 
 combined <- all_questions %>%
   full_join(question_table%>%
@@ -136,4 +136,5 @@ combined <- all_questions %>%
             , by = "hash") %>%
   distinct(hash, .keep_all = TRUE)
 
-write.csv(combined, file = "joined_questions_8.15.21.csv")
+write.csv(combined, file = "joined_questions_10.24.21.csv",
+          row.names = FALSE)
