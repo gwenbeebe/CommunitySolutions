@@ -76,7 +76,7 @@ test_labelled <- test %>%
 test_filtered <- test_labelled %>%
   filter(syuzhet != bing | syuzhet != afinn | syuzhet != nrc |
            bing != afinn | bing != nrc | afinn != nrc) %>%
-  select(-c("ï..rownum", "Participant.Method")) %>%
+  select(-c("?..rownum", "Participant.Method")) %>%
   distinct()
 write.csv(test_filtered, "sentiment_compare.csv")
 
@@ -126,3 +126,16 @@ test <- unique(full_table$Answer[full_table[colnames(full_table) == "fear"] > 0]
 
 free_responses <- read.csv("UnitedFrontSentimentAnalysis\\CodedResponseTable.csv") %>%
   filter(Answer != "")
+
+created <- data.frame(matrix(c(0,0,0,0), nrow = 1))
+colnames(created) <- c("syuzhet", "bing", "afinn", "nrc")
+
+ggplot(melt(test), aes(x = variable, y = value)) +
+  geom_col() +
+  geom_text(aes(label = value), vjust = -0.2)
+
+
+random_order <- sample(1:nrow(free_responses))
+
+free_responses[1,8]
+free_responses[1,10]
