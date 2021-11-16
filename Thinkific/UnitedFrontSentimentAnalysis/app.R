@@ -18,28 +18,15 @@ library(colourpicker)
 drop_auth(rdstoken = "token.rds")
 CSPalette <- c("#BF3B5E", "#F2F2F2", "#735371", "#30698C", "#BFAABA", "#BF3F57", "#385C73")
 
-# loaded_data <- read.csv("FreeTextAnswers.csv") %>%
-#     filter(!is.na(Answer) &
-#                Combined.Questions %nin% c(
-#                    "In what zip code do you currently live?",
-#                    "In what zip code is your workplace located?",
-#                    "What is your job title?",
-#                    "Who is your employer?",
-#                    "How did you participate in this session?",
-#                    "What happens in our brain when we feel judged, devalued, or not accepted?",
-#                    "United Front would like to get some feedback from participants to help with planning for 2022. We thank you in advance for your open and honest responses.On a scale of 1 to 10 with 1 being very dissatisfied and 10 being very satisfied, how satisfied are you with the United Front program so far?"
-#                ))
-# s <- get_nrc_sentiment(iconv(loaded_data$Answer))
-# free_responses <- cbind(loaded_data, s)
-
-# free_responses <- read_sheet("https://docs.google.com/spreadsheets/d/1YaAzNMBca6_RU9VD2v1DNTz_HRcq5b3ypwDGlu-C4o8/edit#gid=609288075") %>%
-#     filter(Answer != "")
-
 free_responses <- drop_read_csv("CodedResponseTableTrimmed.csv") %>%
     select(-"Participant.Method") %>%
     distinct() %>%
     filter(Answer != "")
 sentiment_options <- drop_read_csv("sentiment_compare.csv")
+
+# free_responses <- read.csv("CodedResponseTableTrimmed.csv")
+# sentiment_options <- read.csv("sentiment_compare.csv")
+
 
 sidebar <- dashboardSidebar(
     sidebarMenu(
@@ -56,41 +43,39 @@ body <- dashboardBody(
     tabItems(
         tabItem(tabName = "sentiment",
                 fluidPage(
-                  sidebarLayout(
-                    sidebarPanel(
-                      pickerInput(
-                        label = "Module",
-                        inputId = "module",
-                        multiple = TRUE,
-                        choices = unique(free_responses$Module.Name)),
-                      pickerInput(
-                        label = "Respondent",
-                        inputId = "respondent",
-                        multiple = TRUE,
-                        choices = unique(free_responses$Respondent.Type),
-                        options = pickerOptions(
-                          liveSearch = TRUE, liveSearchStyle = 'contains', actionsBox = TRUE)),
-                      selectInput("survey", "Survey", choices = NULL),
-                      selectInput("question", "Question", choices = NULL)
-                    ),
-                    mainPanel(
-                    fluidRow(valueBoxOutput("response_count"),
-                             downloadButton("download_responses", "Download All")),
-                    fluidRow(plotOutput("sentimentPlot")),
-                    fluidRow(actionButton("anger", "Anger"),
-                             actionButton("anticipation", "Anticipation"),
-                             actionButton("disgust", "Disgust"),
-                             actionButton("fear", "Fear"),
-                             actionButton("joy", "Joy"),
-                             actionButton("sadness", "Sadness"),
-                             actionButton("surprise", "Surprise"),
-                             actionButton("trust", "Trust"),
-                             actionButton("negative", "Negative"),
-                             actionButton("positive", "Positive"),
-                             actionButton("reset", "- Reset -")),
-                    tableOutput("test")
+                    sidebarLayout(
+                        sidebarPanel(
+                            selectInput(
+                                label = "Module",
+                                inputId = "module",
+                                multiple = TRUE,
+                                choices = unique(free_responses$Module.Name)),
+                            selectInput(
+                                label = "Respondent",
+                                inputId = "respondent",
+                                multiple = TRUE,
+                                choices = unique(free_responses$Respondent.Type)),
+                            selectInput("survey", "Survey", choices = NULL),
+                            selectInput("question", "Question", choices = NULL)
+                        ),
+                        mainPanel(
+                            fluidRow(valueBoxOutput("response_count"),
+                                     downloadButton("download_responses", "Download All")),
+                            fluidRow(plotOutput("sentimentPlot")),
+                            fluidRow(actionButton("anger", "Anger"),
+                                     actionButton("anticipation", "Anticipation"),
+                                     actionButton("disgust", "Disgust"),
+                                     actionButton("fear", "Fear"),
+                                     actionButton("joy", "Joy"),
+                                     actionButton("sadness", "Sadness"),
+                                     actionButton("surprise", "Surprise"),
+                                     actionButton("trust", "Trust"),
+                                     actionButton("negative", "Negative"),
+                                     actionButton("positive", "Positive"),
+                                     actionButton("reset", "- Reset -")),
+                            tableOutput("test")
+                        )
                     )
-                  )
                 )
         ),
         tabItem(tabName = "options",
@@ -132,8 +117,6 @@ body <- dashboardBody(
         ),
         tabItem(tabName = "wordcloud",
                 fluidPage(
-                    h1("Word Cloud"),
-                    h4(tags$a(href = "https://www.antoinesoetewey.com/", "Antoine Soetewey")),
                     # Create a container for tab panels
                     tabsetPanel(
                         # Create a "Word cloud" tab
@@ -141,14 +124,18 @@ body <- dashboardBody(
                             title = "Word cloud",
                             sidebarLayout(
                                 sidebarPanel(
-                                    hr(),
-                                    # Wrap the file input in a conditional panel
-                                    conditionalPanel(
-                                        # The condition should be that the user selects
-                                        # "file" from the radio buttons
-                                        condition = "input.source == 'file'",
-                                        fileInput("file", "Select a file")
-                                    ),
+                                    selectInput(
+                                        label = "Module",
+                                        inputId = "wc_module",
+                                        multiple = TRUE,
+                                        choices = unique(free_responses$Module.Name)),
+                                    selectInput(
+                                        label = "Respondent",
+                                        inputId = "wc_respondent",
+                                        multiple = TRUE,
+                                        choices = unique(free_responses$Respondent.Type)),
+                                    selectInput("wc_survey", "Survey", choices = NULL),
+                                    selectInput("wc_question", "Question", choices = NULL),
                                     hr(),
                                     checkboxInput("remove_words", "Remove specific words?", FALSE),
                                     conditionalPanel(
@@ -194,17 +181,10 @@ body <- dashboardBody(
                                     hr(),
                                     numericInput("num", "Maximum number of words",
                                                  value = 30, min = 5
-                                    ),
-                                    hr(),
-                                    colourInput("col", "Background color", value = "white"),
-                                    hr(),
-                                    HTML('<p>Report a <a href="https://github.com/AntoineSoetewey/word-cloud/issues">bug</a> or view the <a href="https://github.com/AntoineSoetewey/word-cloud/blob/master/app.R">code</a>. Back to <a href="https://www.antoinesoetewey.com/">www.antoinesoetewey.com</a>.</p>')
+                                    )
                                 ),
                                 mainPanel(
                                     wordcloud2Output("cloud"),
-                                    # br(),
-                                    # br(),
-                                    # tags$a(href="https://www.antoinesoetewey.com/", "Back to www.antoinesoetewey.com"),
                                     br(),
                                     br()
                                 )
@@ -213,25 +193,11 @@ body <- dashboardBody(
                         # Create an "About this app" tab
                         tabPanel(
                             title = "About this app",
-                            br(),
-                            "Instructions on how to use this Shiny app:",
-                            br(),
-                            br(),
-                            HTML("<ul><li>When uploading a file, make sure to upload a .csv or .txt file</li>
-       <li>If it is a .csv file, there should be only one column containing all words or sentences (see below for example files)</li>
-       <li>Numbers and punctuations will be automatically removed, as well as stop words in the language of your choice (via the dropdown selector)</li></ul>"),
-                            "Example files:",
-                            tags$a(href = "https://www.antoinesoetewey.com/files/ihaveadream.csv", "example.csv"),
-                            "and",
-                            tags$a(href = "https://www.antoinesoetewey.com/files/ihaveadream.txt", "example.txt"),
+                            h4(tags$a(href = "https://www.antoinesoetewey.com/", "Antoine Soetewey")),
                             br(),
                             br(),
-                            em("Source: DataCamp"),
+                            em("Adapted from DataCamp"),
                             br(),
-                            br(),
-                            HTML('<p>Report a <a href="https://github.com/AntoineSoetewey/word-cloud/issues">bug</a> or view the <a href="https://github.com/AntoineSoetewey/word-cloud/blob/master/app.R">code</a>. Back to <a href="https://www.antoinesoetewey.com/">www.antoinesoetewey.com</a>.</p>'),
-                            br(),
-                            br()
                         )
                     )))
     )
@@ -481,17 +447,43 @@ server <- function(input, output) {
     
     
     
+    
+    wc_module <- reactive({
+        filter(free_responses, Module.Name %in% input$wc_module)
+    })
+    observeEvent(wc_module(), {
+        choices <- unique(wc_module()$Respondent.Type)
+        updateSelectInput(inputId = "wc_respondent", choices = choices) 
+    })
+    
+    wc_respondent <- reactive({
+        req(input$wc_respondent)
+        filter(wc_module(), Respondent.Type %in% input$wc_respondent)
+    })
+    observeEvent(wc_respondent(), {
+        choices <- unique(wc_respondent()$Survey.Type)
+        updateSelectInput(inputId = "wc_survey", choices = choices, selected = NULL)
+    })
+    
+    wc_survey <- reactive({
+        req(input$wc_survey)
+        filter(wc_respondent(), Survey.Type == input$wc_survey)
+    })
+    observeEvent(wc_survey(), {
+        choices <- unique(wc_survey()$Combined.Questions)
+        updateSelectInput(inputId = "wc_question", choices = choices, selected = NULL)
+    })
+    
     data_source <- reactive({
+        req(input$wc_question)
         answered <- wc_survey() %>% 
             filter(Combined.Questions == input$wc_question)
-        data <- free_responses$Answer
+        data <- answered$Answer
         return(data)
     })
     
-    
-    create_wordcloud <- function(data, num_words = 100, background = "white") {
-        
-        # If text is provided, convert it to a dataframe of word frequencies
+    create_wordcloud <- function(data, num_words = 15, background = "white") {
+        req(input$wc_question)
         if (is.character(data)) {
             corpus <- Corpus(VectorSource(data))
             corpus <- tm_map(corpus, tolower)
@@ -512,24 +504,20 @@ server <- function(input, output) {
             data <- sort(rowSums(tdm), decreasing = TRUE)
             data <- data.frame(word = names(data), freq = as.numeric(data))
         }
-        
-        # Make sure a proper num_words is provided
         if (!is.numeric(num_words) || num_words < 3) {
             num_words <- 3
         }
-        
-        # Grab the top n most common words
         data <- head(data, n = num_words)
         if (nrow(data) == 0) {
             return(NULL)
         }
-        
-        wordcloud2(data, backgroundColor = background)
+        wordcloud2(data, 
+                   color = sample(c("#BF3B5E", "#735371", "#30698C", "#BFAABA", "#BF3F57", "#385C73"), num_words, replace = TRUE),
+                   backgroundColor = background)
     }
     output$cloud <- renderWordcloud2({
         create_wordcloud(data_source(),
-                         num_words = input$num,
-                         background = input$col
+                         num_words = input$num
         )
     })
 }

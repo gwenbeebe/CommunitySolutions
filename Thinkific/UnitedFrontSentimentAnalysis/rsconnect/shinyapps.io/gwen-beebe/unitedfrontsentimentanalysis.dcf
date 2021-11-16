@@ -5,9 +5,9 @@ account: gwen-beebe
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 5031467
-bundleId: 5238490
+bundleId: 5256436
 url: https://gwen-beebe.shinyapps.io/unitedfrontsentimentanalysis/
-when: 1636582278.24568
-lastSyncTime: 1636582278.24568
+when: 1637033136.13898
+lastSyncTime: 1637033136.13898
 asMultiple: FALSE
 asStatic: FALSE
