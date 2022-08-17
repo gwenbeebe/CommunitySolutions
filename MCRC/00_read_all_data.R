@@ -78,15 +78,17 @@ arrest_data_clean <- arrest_data %>%
 small_arrests <- arrest_data_clean %>%
   # filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
   #                             "OUTRIGHT WITH WARRANTS")) %>%
-  select("person_id", "BookingDate", "AdmissionType", "GALLERY")
+  select("person_id", "BookingDate", "AdmissionType", "ReleaseDate",
+         "OffenseDescription", "ReleaseType", "GALLERY")
 
-write.csv(small_arrests, file = "small_arrests.csv", row.names = FALSE)
+write.csv(small_arrests, file = "small_arrests_2.9.22 v2.csv", row.names = FALSE)
 
 #################################################
 ##  update release data
 #################################################
 ##  pick releases file to read in
-release_file <- file.choose(); release_data <- read_excel(release_file)
+# release_file <- file.choose(); release_data <- read_excel(release_file)
+release_file <- file.choose(); release_data <- read.csv(release_file)
 
 ##  when there's extra rows
 release_data <- read_excel(release_file,  
@@ -106,14 +108,15 @@ small_releases <- release_data_clean %>%
   filter(COUNTY == 49) %>%
   select(person_id, RELFROM, COUNTY, FACRLD)
 
-write.csv(small_releases, file = "small_releases.csv", row.names = FALSE)
+write.csv(small_releases, file = "small_releases_1.31.22.csv", row.names = FALSE)
 
 
 #################################################
 ##  update admissions data
 #################################################
 ##  pick admissions file to read in
-admission_file <- file.choose(); admission_data <- read_excel(admission_file)
+# admission_file <- file.choose(); admission_data <- read_excel(admission_file)
+admission_file <- file.choose(); admission_data <- read.csv(admission_file)
 
 ##  when there's extra rows
 admission_data <- read_excel(admission_file,  
@@ -135,7 +138,7 @@ admission_data_clean <- admission_data %>%
 small_admits <- admission_data_clean %>%
   select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM)
 
-write.csv(small_admits, file = "small_admits.csv", row.names = FALSE)
+write.csv(small_admits, file = "small_admits_1.31.22.csv", row.names = FALSE)
 
 
 #################################################

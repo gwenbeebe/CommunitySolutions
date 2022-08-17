@@ -21,7 +21,7 @@ library(stringr)
 
 
 all_surveys <- list.files(
-  paste0(getwd(), "/data/Thinkific Exports - CSV October"),
+  paste0(getwd(), "/data/Exit Surveys Only"),
   full.names = TRUE)
 
 ##  create list to store table names
@@ -235,7 +235,7 @@ for (get_file in all_surveys) {
     arrange(`Date Completed`) %>%
     distinct(`Course Name`, `Survey Name`, `Student Email`, Question, .keep_all = TRUE)
   
-  write.csv(question_responses, file = "complete_response_table 10.24.21.csv",
+  write.csv(question_responses, file = "wrap-up-surveys 1.13.22.csv",
             row.names = FALSE)
   
 
