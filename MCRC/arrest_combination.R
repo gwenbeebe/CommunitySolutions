@@ -1,9 +1,11 @@
-library(janitor)
+# library(rlang)
 library(tidyverse)
 library(lubridate)
+library(readxl)
 library(stringr)
+library(digest)
 
-# `%nin%` = Negate(`%in%`)
+`%nin%` = Negate(`%in%`)
 
 matchColClasses <- function(df1, df2) {
   
@@ -18,192 +20,208 @@ matchColClasses <- function(df1, df2) {
 }
 
 
-
 all_files <- list.files(
-  paste0(getwd(), "/data/IMPD Arrest Data Files"),
+  paste0(getwd(), "/Arrest Files"),
   full.names = TRUE,
   # recursive = TRUE)
   recursive = FALSE)
 
-release_files <- all_files[endsWith(all_files, ".csv")]
-# admit_files <- all_files[grepl("ADM", all_files)]
+arrest_release_files <- all_files[grepl("rel", tolower(all_files))]
+arrest_booking_files <- all_files[grepl("boo", tolower(all_files))]
+
 
 all_file_names <- list.files(
-  paste0(getwd(), "/data/IMPD Arrest Data Files"),
+  paste0(getwd(), "/Arrest Files"),
   # recursive = TRUE)
   recursive = FALSE)
 
-release_file_names <- all_files[endsWith(all_files, "MCSO.csv")]
-# admit_file_names <- all_file_names[grepl("ADM", all_file_names)]
+arrest_release_file_names <- all_file_names[grepl("rel", tolower(all_files))]
+arrest_booking_file_names <- all_file_names[grepl("boo", tolower(all_files))]
 file_length <- matrix(ncol = 2)
 
+# test_arrest_release_files <- arrest_release_files[1:5]
+# test_arrest_release_files <- arrest_release_files[length(arrest_release_files) - 10:length(arrest_release_files)]
 
 #####################################
-############ RELEASES ############### 
+############ arrest_releaseS ############### 
 #####################################
 
-for (i in 1:length(release_files)) {
-  file <- release_files[i]
+# for checking whether all columns are shared
+# for (i in 1:length(arrest_booking_files)) {
+#   if (exists("R_C_N")) {
+#     R_C_N <- R_C_N %>%
+#       rbind(colnames(read_csv(arrest_release_files[i])))
+#   } else {
+#     R_C_N <- colnames(read_csv(arrest_release_files[i]))
+#   }
+# }
+
+for (i in 1:length(arrest_release_files)) {
+    
+  file <- arrest_release_files[i]
   
-  print(file)
+  print(paste0(file, "  (i = ", i, ")"))
   
-  file_top <- as.data.frame(
-    read.csv(file,
-             header = FALSE,
-             skipNul = TRUE,
-             nrows = 5))
-  # file_top <- read.table(file, 
-  #                        nrow = 5, stringsAsFactors = FALSE, sep = ",")
-  # 
-  releases <- read.csv(file, 
-                       # skip = which.max(file_top[,1] %in% c("Obs", "LASTNAME")) - max(file_top[,1] == ""), 
-                       skip = which.max(file_top[,1] %in% c("Obs", "LASTNAME")) - 1, 
-                       skipNul = TRUE)
-  hold <- file_top
-  if (exists("release_columns")) {
-    release_columns <- intersect(release_columns, colnames(releases))
+  if (grepl("csv", tolower(file))) {
+    arrest_releases <- read_csv(file,
+                         show_col_types = FALSE)
   } else {
-    release_columns <- colnames(releases)
+    arrest_releases <- readxl::read_excel(file)
   }
   
-  selected_releases <- releases %>%
-    select(all_of(release_columns)) %>%
-    mutate(FileName = release_file_names[i])
+  arrest_releases <- arrest_releases[, 1:23]
   
-  # assign(release_file_names[i], selected_releases)
-  
-  if (exists("combined_releases")) {
-    combined_releases <- combined_releases %>%
-      select(c(all_of(release_columns), FileName))
-    
-    attempt <- try(combined_releases %>%
-                     union(selected_releases),
-                   silent = TRUE)
-    print("try-error" %in% class(attempt))
-    if ("try-error" %in% class(attempt)) {
-      selected_releases <- matchColClasses(combined_releases, selected_releases)
-      combined_releases <- combined_releases %>%
-        union(selected_releases)
-    }
-    else {
-      combined_releases <- attempt
-    }
-    
+  if(!exists("arrest_release_col_names")){
+    arrest_release_col_names <- colnames(arrest_releases)
   } else {
-    combined_releases <- selected_releases
+    colnames(arrest_releases) <- arrest_release_col_names
+  }
+  
+  if (length(class(arrest_releases$`Book Date`)) == 2) {
+    
+  }
+  
+  selected_arrest_releases <- arrest_releases %>%
+    mutate(FileName = arrest_release_file_names[i],
+           across(contains("Date") &
+                    !where(is.POSIXct), ~  as.Date(parse_date_time2(., orders = c('mdyHM', 'mdYHM', 'ymdHMS')))),
+           across(where(is.POSIXct), ~ as.Date(.)),
+           across(everything(), as.character),
+           GALLERY = str_remove(gsub("[^0-9.-]", "", GALLERY), "^0+"))
+  
+  if (exists("combined_arrest_releases")) {
+    combined_arrest_releases <- combined_arrest_releases %>%
+      union(selected_arrest_releases)
+  } else {
+    combined_arrest_releases <- selected_arrest_releases
   }
   
   file_length <- rbind(file_length, c(
-    release_file_names[i], nrow(combined_releases)))
+    arrest_release_file_names[i], nrow(combined_arrest_releases)))
   
-  print(paste(ncol(combined_releases), length(release_columns)))
+  print(paste(ncol(combined_arrest_releases)))
 }
 
-# write.csv(file_length, file = "file_length.csv")
-# write.csv(combined_releases, file = "combined_releases.csv")
 
-deduped_releases <- combined_releases %>%
-  # mutate(last_name = strsplit(Inmate.Last..First..Middle, split = ",")[1])
-  separate(Inmate.Last..First..Middle, c("LASTNAME", "FIRSTNAME"), sep = ", ") %>%
-  mutate(person_id = paste0(substr(LASTNAME, 0, 3),
-                            substr(FIRSTNAME, 0, 3),
-                            str_replace_all(as.Date(DOB, "%m/%d/%Y"), "[^[:alnum:]]", "")),
-         Book.Date = mdy(gsub( " .*$", "", Book.Date)),
-         Release.Date = mdy(gsub( " .*$", "", Release.Date))) %>%
-  distinct(person_id, Book.Date, Release.Date, .keep_all = TRUE)
+#####################################
+########### ADMISSIONS ############## 
+#####################################
 
-write.csv(deduped_releases, file = "all_arrest_data_6.23.22.csv", row.names = FALSE)
-# write.csv(release_offenses, file = "tableau_release_offenses_3.19.22.csv", row.names = FALSE)
+for (i in 1:length(arrest_booking_files)) {
+  
+  file <- arrest_booking_files[i]
+  
+  print(paste0(file, "  (i = ", i, ")"))
+  
+  if (grepl("csv", tolower(file))) {
+    arrest_bookings <- read_csv(file,
+                         show_col_types = FALSE)
+  } else {
+    arrest_bookings <- readxl::read_excel(file)
+  }
+  
+  arrest_bookings <- arrest_bookings[, 1:23]
+  
+  if(!exists("arrest_booking_col_names")){
+    arrest_booking_col_names <- colnames(arrest_bookings)
+  } else {
+    colnames(arrest_bookings) <- arrest_booking_col_names
+  }
+  
+  selected_arrest_bookings <- arrest_bookings %>%
+    mutate(FileName = arrest_booking_file_names[i],
+           across(contains("Date") &
+                    !where(is.POSIXct), ~  as.Date(parse_date_time2(., orders = c('mdyHM', 'mdYHM', 'ymdHMS')))),
+           across(where(is.POSIXct), ~ as.Date(.)),
+           across(everything(), as.character),
+           GALLERY = str_remove(gsub("[^0-9.-]", "", GALLERY), "^0+"))
+  
+  if (exists("combined_arrest_bookings")) {
+    combined_arrest_bookings <- combined_arrest_bookings %>%
+      union(selected_arrest_bookings)
+  } else {
+    combined_arrest_bookings <- selected_arrest_bookings
+  }
+  
+  file_length <- rbind(file_length, c(
+    arrest_booking_file_names[i], nrow(combined_arrest_bookings)))
+  
+  print(paste(ncol(combined_arrest_bookings)))
+}
 
-
-
-#################################################
-# test <- deduped_releases %>%
-#   group_by(Release.Type) %>%
-#   summarise(inmate = max(Booking.No.), 
-#             releases = n(), 
-#             last_used = max(as.Date(Release.Date, "%m/%d/%Y"))) %>% 
-#   arrange(releases)
-# 
-# test
-# 
-# file <- file.choose(); release_charges <- read.csv(file)
-# file <- file.choose(); admit_charges <- read.csv(file)
-# 
-# charge_columns <- c("relevant_date", "conviction_class", 
-#                     "offense", "offense_type", "origin")
-# small_charges <- release_charges %>%
-#   select(EDS, CNVCLS, OFF1, TYPE1) %>%
-#   mutate(origin = "Release") %>%
-#   `colnames<-`(charge_columns) %>%
-#   union(release_charges %>%
-#           select(EDS, CNVCLS, OFF2, TYPE2) %>%
-#           mutate(origin = "Release") %>%
-#           filter(!is.na(OFF2)) %>%
-#           `colnames<-`(charge_columns)) %>%
-#   union(admit_charges %>%
-#           select(EDS, CNVCLS, OFF1, TYPE1) %>%
-#           mutate(origin = "Admit") %>%
-#           `colnames<-`(charge_columns)) %>%
-#   union(release_charges %>%
-#           select(EDS, CNVCLS, OFF2, TYPE2) %>%
-#           mutate(origin = "Admit") %>%
-#           filter(!is.na(OFF2)) %>%
-#           `colnames<-`(charge_columns)) %>%
-#   union(deduped_releases %>%
-#           select(Offense.Date, DEGREE, Offense) %>%
-#           mutate(type = "", origin = "Arrest Releases") %>%
-#           filter(!is.na(Offense)) %>%
-#           `colnames<-`(charge_columns))
-# 
-# write.csv(small_charges, file = "all_offenses_5.17.22.csv")
-#################################################
-
-##  summaries
-
-# create recidivism summary
-recidivism <- deduped_releases %>%
-  filter(!is.na(Release.Date)) %>%
-  select(person_id, Release.Date) %>%
-  left_join(deduped_releases %>%
-              # filter(AdmissionType %in% c("OUTRIGHT ONLY", "OUTRIGHT WITH HOLD",
-              #                             "OUTRIGHT WITH WARRANTS")) %>%
-              select(person_id, Book.Date),
-            by = "person_id") %>%
-  mutate(return_flag = case_when(
-    Release.Date < Book.Date
-    # & (Release.Date + days(364)) >= Book.Date ~ TRUE,
-    & (Release.Date + days(182)) >= Book.Date ~ TRUE,
-    TRUE ~ FALSE)) %>%
-  arrange(desc(return_flag)) %>%
-  select(-Book.Date) %>%
-  mutate(cohort_of_release = paste(year(Release.Date), if_else(month(Release.Date) <= 6, "A", "B"))) %>%
-  # mutate(cohort_of_release = paste(year(Release.Date), if_else(month(Release.Date) <= 3, "A", "B"))) %>%
-  group_by(person_id, cohort_of_release) %>%
+demographics <- combined_arrest_releases %>%
+  union(combined_arrest_bookings) %>%
+  group_by(GALLERY) %>%
   slice(1L) %>%
-  ungroup()
+  select(GALLERY, DOB, GENDER, `Hispanic / Latino`, RACE)
+
+deduped_arrest_releases <- combined_arrest_releases %>%
+  select(-FileName) %>%
+  mutate(UniqueID = paste0(GALLERY, "-", `Release Date`),
+         DOB = parse_date_time(DOB, orders = c('mdy', 'ymd'))) %>%
+  group_by(UniqueID) %>%
+  slice(1L) %>%
+  ungroup() %>%
+  select(-c(UniqueID, `Inmate Last, First, Middle`,
+         DOB, GENDER, `Hispanic / Latino`, RACE))
+
+deduped_arrest_bookings <- combined_arrest_bookings %>%
+  select(-FileName) %>%
+  mutate(UniqueID = paste0(GALLERY, "-", `Book Date`),
+         DOB = parse_date_time(DOB, orders = c('mdy', 'ymd'))) %>%
+  group_by(UniqueID) %>%
+  # slice(1L) %>%
+  ungroup() %>%
+  select(-c(UniqueID, `Inmate Last, First, Middle`,
+         DOB, GENDER, `Hispanic / Latino`, RACE))
+
+#write.csv(demographics, file = "jail_demographics_1.17.22.csv", row.names = FALSE)
+#write.csv(deduped_arrest_releases, file = "jail_arrest_releases_1.17.23.csv", row.names = FALSE)
+#write.csv(deduped_arrest_bookings, file = "jail_arrest_bookings_1.17.23.csv", row.names = FALSE)
 
 
-# create summary text table
-summary_table <- recidivism %>%
-  tabyl(cohort_of_release, return_flag) %>%
-  # mutate(month_of_release = paste(month(month_of_release, label = TRUE), year(month_of_release))) %>%
-  adorn_totals("row") %>%
-  adorn_percentages("row") %>%
-  adorn_pct_formatting(0) %>%
-  adorn_ns()
+big_arrest_table <- combined_arrest_releases %>%
+  union(combined_arrest_bookings) %>%
+  select(-FileName) %>%
+  separate(`Inmate Last, First, Middle`, 
+           into = c("LastName", "FirstName"), sep = ", ") %>%
+  mutate(DOB = parse_date_time(DOB, orders = c('mdy', 'ymd')),
+         person_id = paste0(substr(LastName, 0, 3),
+                            substr(FirstName, 0, 3),
+                            str_replace_all(DOB, "[^[:alnum:]]", "")),
+         `Book Date` = ymd(`Book Date`)) 
 
-write.table(summary_table, "clipboard", sep="\t")
+arrest_demographics <- big_arrest_table %>%
+  group_by(person_id) %>%
+  slice(1L) %>%
+  ungroup() %>%
+  select(person_id, LastName, FirstName, DOB, GENDER, RACE, `Book Date`)
 
-# # create draft chart for exploration
-# chart_table <- recidivism %>%
-#   filter(FACRLD >= (today() - years(2))) %>%
-#   mutate(month_of_release = floor_date(FACRLD, "month")) %>%
-#   group_by(month_of_release, return_flag) %>%
-#   summarise(people = n()) %>%
-#   arrange(month_of_release) %>%
-#   mutate(month_of_release = paste(month(month_of_release, label = TRUE), year(month_of_release)))
-# 
-# ggplot(chart_table, aes(fill=return_flag, y=people, x=month_of_release)) + 
-#   geom_bar(position="fill", stat="identity") +
-#  coord_flip()
+all_arrests <- big_arrest_table %>%
+  mutate(UniqueID = paste0(GALLERY, "-", `Book Date`)) %>%
+  group_by(UniqueID) %>%
+  slice(1L) %>%
+  ungroup() %>%
+  select(-c(UniqueID, DOB, GENDER, `Hispanic / Latino`, RACE))
+
+
+
+# write.csv(all_arrests, file = "all_arrest_data_4.4.23.csv", row.names = FALSE)
+
+
+lookback_stop_date <- max(all_arrests$`Book Date`)
+
+##  for daily bookings file
+mini_arrest_data <- all_arrests %>%
+  # filter(`Book Date` >= mdy("1/1/22") &
+  #          `Book Date` <= mdy("12/31/22")) %>%
+  filter(`Book Date` >= lookback_stop_date %m-% years(1)) %>%
+  group_by(GALLERY) %>%
+  summarise(num_arrests = n_distinct(`Book Date`, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(num_arrests >= 3)
+
+# write.csv(mini_arrest_data, file = "mini_arrest_data.2.6.24.csv", row.names = FALSE)
+
+
+  
