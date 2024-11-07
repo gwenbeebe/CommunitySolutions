@@ -92,6 +92,10 @@ for (i in 1:length(release_files)) {
     # for old files
     releases <- try_to_read_csv(file)
     
+    ## new as of 8.8.24
+  } else if("Export Worksheet" %in% excel_sheets(file)) {
+    releases <- readxl::read_excel(file,
+                                   sheet = "Export Worksheet")
   } else {
     releases <- readxl::read_excel(file)
   }
@@ -223,11 +227,17 @@ for (i in 1:length(admit_files)) {
     # for old files
     admits <- try_to_read_csv(file)
     
+    ## below is new as of 8.8.24
+  } else if("Export Worksheet" %in% excel_sheets(file)) {
+    admits <- readxl::read_excel(file,
+                                 sheet = "Export Worksheet")
   } else {
-    admits <- readxl::read_excel(file)
+    admits <- readxl::read_excel(file) 
   }
   
   if(str_detect(file, new_directory)) {
+    print(file)
+    # print(colnames(admits))
     admits <- admits %>%
       rename(
         LASTNAME = LAST_NAME,
@@ -235,7 +245,8 @@ for (i in 1:length(admit_files)) {
         SEX = GENDER,
         COUNTY = COUNTY_OF_COMMIT,
         RECVDT = DELTA_RECEIVE_DT,
-        DOCNUM = DOC_NUMBER
+        DOCNUM = DOC_NUMBER,
+        INTKDT = DELTA_INTAKE_DT
       ) %>%
       mutate(DOB = NA) %>%
       filter(COUNTY == "Marion")
@@ -438,15 +449,16 @@ get_tableau_releases <- deduped_releases
 # get_tableau_admits <- file.choose(); get_tableau_admits <- read.csv(get_tableau_admits)
 get_tableau_admits <- deduped_admits
 # add key columns and remove duplicates
-# small_admits <- get_tableau_admits %>%
-#   mutate(person_id = paste0(substr(LASTNAME, 0, 3),
-#                             substr(FIRSTNAM, 0, 3),
-#                             str_replace_all(DOB, "[^[:alnum:]]", "")),
-#          admit_row_id = row_number()) %>%
-#   # filter(INTKSTCD %nin% c(10, 11, 15, 16, 17, 18, 43)) %>%
-#   # distinct(person_id, INTKDT, .keep_all = TRUE)
-#   distinct(person_id, INTKDT, RECVDT, .keep_all = TRUE) %>%
-#   select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM, RECVDT, RECFAC, RECVCD)
+small_admits <- get_tableau_admits %>%
+  mutate(person_id = paste0(substr(LASTNAME, 0, 3),
+                            substr(FIRSTNAM, 0, 3),
+                            str_replace_all(DOB, "[^[:alnum:]]", "")),
+         admit_row_id = row_number()) %>%
+  # filter(INTKSTCD %nin% c(10, 11, 15, 16, 17, 18, 43)) %>%
+  # distinct(person_id, INTKDT, .keep_all = TRUE)
+  distinct(person_id, INTKDT, RECVDT, .keep_all = TRUE) %>%
+  # select(person_id, COUNTY, INTKDT, INTKSTCD, DOCNUM, RECVDT, RECFAC, RECVCD)
+  select(person_id, COUNTY, INTKDT, DOCNUM, RECVDT)
 
 # write.csv(small_admits, file = "small_admits_4.4.23.csv", row.names = FALSE)
 
@@ -560,15 +572,15 @@ summary_table <- dashboard_table %>%
   group_by(cohort_of_release) %>%
   summarise(across(where(is.numeric), ~ round(mean(.x, na.rm = TRUE) * 100, 1))) 
   
-# write_csv(dashboard_table, "IDOC_dashboard_data_2.21.24.csv")
+# write_csv(dashboard_table, "IDOC_dashboard_data_10.10.24.csv")
 
 
-test <- combined_releases  %>%
-  mutate(month = month(FACRLD),
-         year = year(FACRLD)) %>%
-  group_by(month, year) %>%
-  summarise(rows = n()) %>%
-  arrange(year, month)
+# test <- combined_releases  %>%
+#   mutate(month = month(FACRLD),
+#          year = year(FACRLD)) %>%
+#   group_by(month, year) %>%
+#   summarise(rows = n()) %>%
+#   arrange(year, month)
 
 
 
@@ -577,22 +589,22 @@ test <- combined_releases  %>%
 ctc_idoc_data <- small_admits %>%
   # select(person_id, DOCNUM, RECVDT) %>%
   filter(RECVDT >= mdy("4/1/18")) %>%
-  left_join(get_tableau_releases %>%
-              mutate(RECVDT = parse_date_time(RECVDT, orders = c('ymd', 'mdy'))) %>%
-              distinct(DOCNUM, RECVDT, .keep_all = TRUE) %>%
-              select(DOCNUM, RECVDT, FACRLD),
-            by = c("DOCNUM", "RECVDT")) %>%
+  # left_join(get_tableau_releases %>%
+  #             mutate(RECVDT = parse_date_time(RECVDT, orders = c('ymd', 'mdy'))) %>%
+  #             distinct(DOCNUM, RECVDT, .keep_all = TRUE) %>%
+  #             select(DOCNUM, RECVDT, FACRLD),
+  #           by = c("DOCNUM", "RECVDT")) %>%
   rowwise() %>%
   mutate(person_id = digest(person_id)) %>%
   ungroup()
-
-ctc_previous_idoc_data <- ctc_idoc_data %>%
-  group_by(person_id) %>%
-  arrange(desc(RECVDT)) %>%
-  mutate(admit_count = row_number()) %>%
-  ungroup() %>%
-  filter(admit_count == 1 |
-           RECVDT >= mdy("4/1/23"))
+# 
+# ctc_previous_idoc_data <- ctc_idoc_data %>%
+#   group_by(person_id) %>%
+#   arrange(desc(RECVDT)) %>%
+#   mutate(admit_count = row_number()) %>%
+#   ungroup() %>%
+#   filter(admit_count == 1 |
+#            RECVDT >= mdy("4/1/23"))
 
 ctc_arrest_data <- arrest_data_clean %>%
   filter(`Book Date` >= mdy("4/1/18")) %>%
@@ -615,14 +627,14 @@ ctc_previous_arrest_data <- ctc_arrest_data %>%
 #   summarise(BookDates = toString(`Book Date`),
 #             Offenses = toString(Offense))
 
-write.csv(ctc_previous_idoc_data, 
-          file = "ctc_previous_idoc_data.csv", row.names = FALSE)
-write.csv(ctc_previous_arrest_data, 
-          file = "ctc_previous_arrest_data.csv", row.names = FALSE)
-
-write.csv(ctc_idoc_data, 
+# write.csv(ctc_previous_idoc_data, 
+#           file = "ctc_previous_idoc_data.csv", row.names = FALSE)
+# write.csv(ctc_previous_arrest_data, 
+#           file = "ctc_previous_arrest_data.csv", row.names = FALSE)
+# 
+write.csv(ctc_idoc_data,
           file = "ctc_idoc_data.csv", row.names = FALSE)
-write.csv(ctc_arrest_data, 
+write.csv(ctc_arrest_data,
           file = "ctc_arrest_data.csv", row.names = FALSE)
 
 
